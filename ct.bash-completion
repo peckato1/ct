@@ -25,14 +25,19 @@ _ct() {
     return
   fi
 
-  local words=(pct "${COMP_WORDS[@]:1:COMP_CWORD}")
-  if ((COMP_CWORD > 2)) && $container; then
-    words[2]=$(ct __resolve "${words[2]}" 2>/dev/null) || words[2]=${COMP_WORDS[2]}
+  # pct's own completion (complete -C) gets the command line as typed, which COMP_WORDS is not:
+  # bash splits it at '=' too. So pass on COMP_LINE, starting with pct instead of ct.
+  local line=${COMP_LINE:0:COMP_POINT} prev=${COMP_WORDS[COMP_CWORD - 1]} vmid
+  line=pct${line#*"${COMP_WORDS[0]}"}
+  if ((COMP_CWORD == 1)); then prev=pct; fi
+  if ((COMP_CWORD > 2)) && $container && vmid=$(ct __resolve "${COMP_WORDS[2]}" 2>/dev/null) &&
+    [[ $line =~ ^(pct[[:space:]]+[^[:space:]]+[[:space:]]+)"${COMP_WORDS[2]}"(.*)$ ]]; then
+    line=${BASH_REMATCH[1]}$vmid${BASH_REMATCH[2]}
+    if ((COMP_CWORD == 3)); then prev=$vmid; fi
   fi
-  local line="${words[*]}"
 
   mapfile -t COMPREPLY < <(
-    COMP_LINE=$line COMP_POINT=${#line} pct bashcomplete pct "$cur" "${words[COMP_CWORD - 1]}" 2>/dev/null
+    COMP_LINE=$line COMP_POINT=${#line} pct bashcomplete pct "$cur" "$prev" 2>/dev/null
   )
 }
 

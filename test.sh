@@ -100,6 +100,8 @@ source "$here/ct.bash-completion"
 complete_ct() {
   COMP_WORDS=(ct "$@")
   COMP_CWORD=$#
+  COMP_LINE="ct $*"
+  COMP_POINT=${#COMP_LINE}
   _ct
   echo "${COMPREPLY[*]}"
 }
@@ -112,6 +114,13 @@ check "help gets no names"              "pct help e|e|help"                    "
 check "name is replaced by VMID"        "pct snapshot 101 ||101"               "$(complete_ct snapshot stag '')"
 check "help argument is not resolved"   "pct help db ||db"                     "$(complete_ct help db '')"
 check "option is not resolved"          "pct enter --help ||--help"            "$(complete_ct enter --help '')"
+# bash splits "name=et" into three words, but pct's own completion gets the line as typed.
+check "command line goes to pct as typed" "pct set 101 --net0 name=et|et|=" "$(
+  COMP_WORDS=(ct set stag --net0 name "=" et) COMP_CWORD=6 COMP_LINE="ct set stag --net0 name=et"
+  COMP_POINT=${#COMP_LINE}
+  _ct
+  echo "${COMPREPLY[*]}"
+)"
 
 echo
 if ((failures)); then
