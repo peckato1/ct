@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Shellcheck
+        run: shellcheck -x -s bash ct ct.bash-completion test.sh build-deb.sh
+
+      - name: Tests
+        run: ./test.sh
+
+      - name: Build package
+        run: |
+          if [[ $GITHUB_REF_TYPE == tag ]]; then
+            ./build-deb.sh "$GITHUB_REF_NAME"
+          else
+            ./build-deb.sh "0~git${GITHUB_SHA::7}"
+          fi
+
+      # Also attached as ct_all.deb, so releases/latest/download/ct_all.deb always points to the newest one.
+      - name: Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp dist/ct_*_all.deb dist/ct_all.deb
+          gh release create "$GITHUB_REF_NAME" dist/*.deb --title "$GITHUB_REF_NAME" --generate-notes

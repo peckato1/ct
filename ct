@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# ct — wrapper around `pct` that takes a container name (or a fragment of it) instead of a VMID.
+# See usage() below or README.md.
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: ct <command> <name|fragment|vmid> [args...]
+
+Wrapper around pct that takes a container name instead of a VMID.
+
+  ct enter web             pct enter <vmid of container "web">
+  ct stop stag             fragment works too (case-insensitive)
+  ct snapshot web pre-upg  remaining arguments go to pct unchanged
+  ct start 105             numeric VMIDs still work
+
+Lookup order: exact name, then fragment. When more containers match,
+ct lists them and runs nothing. Destroy by fragment asks for confirmation.
+
+A number is a VMID or an exact name, never a fragment. A number that matches
+neither is passed through unchanged (create, restore); one that is both
+a VMID and another container's name is refused.
+
+Anything else (no container argument, list, cpusets, help, options)
+is passed straight to pct; see `ct help` for pct's commands.
+EOF
+}
+
+die() { echo "ct: $*" >&2; exit 1; }
+
+if [[ ${1-} == @(-h|--help) ]]; then
+  usage
+  exit 0
+fi
+
+# Print an error followed by the candidate containers, then exit.
+ambiguous() {
+  echo "ct: $1" >&2
+  printf '  %s\n' "${@:2}" >&2
+  exit 1
+}
+
+# Commands without a VMID, or with an option in its place, are passed straight through.
+if (($# < 2)) || [[ $1 =~ ^(list|cpusets|help)$ || $2 == -* ]]; then
+  exec pct "$@"
+fi
+
+cmd=$1 target=$2
+shift 2
+
+# A number is a VMID or an exact name, never a fragment: `ct restore 11 …` must not hit 111.
+numeric=false
+[[ $target =~ ^[0-9]+$ ]] && numeric=true
+
+# "VMID Status Lock Name" — Lock is often empty, so take the first and last column.
+id_name="" exact=() fuzzy=()
+while read -r id name; do
+  # The container with this VMID only counts as an ID match, so a name equal to its own VMID is no clash.
+  if [[ $id == "$target" ]]; then id_name=$name; continue; fi
+  if [[ $name == "$target" ]]; then exact+=("$id $name"); fi
+  if ! $numeric && [[ ${name,,} == *"${target,,}"* ]]; then fuzzy+=("$id $name"); fi
+done < <(pct list | awk 'NR > 1 { print $1, $NF }')
+
+if [[ -n $id_name ]] && ((${#exact[@]})); then
+  ambiguous "'$target' is the VMID of '$id_name' and also the name of another container, doing nothing:" "${exact[@]}"
+fi
+
+if $numeric && ((${#exact[@]} == 0)); then
+  # Plain VMID, or a nonexistent one (create, restore…) — pass through unchanged.
+  vmid=$target name=""
+else
+  # An exact name match wins over fragments.
+  matches=("${exact[@]}")
+  ((${#matches[@]})) || matches=("${fuzzy[@]}")
+  case ${#matches[@]} in
+    0) die "no container matches '$target'" ;;
+    1) read -r vmid name <<<"${matches[0]}" ;;
+    *) ambiguous "'$target' matches multiple containers:" "${matches[@]}" ;;
+  esac
+fi
+
+# Internal command for bash completion: just print the VMID.
+if [[ $cmd == __resolve ]]; then
+  echo "$vmid"
+  exit 0
+fi
+
+if [[ -n $name ]]; then
+  # Destroy by fragment requires confirmation.
+  if [[ $cmd == destroy ]] && ((${#exact[@]} == 0)); then
+    read -rp "ct: really pct destroy $vmid ($name)? [y/N] " answer </dev/tty
+    [[ $answer == [yY] ]] || die "aborted"
+  fi
+  echo "→ pct $cmd $vmid ($name)" >&2
+fi
+exec pct "$cmd" "$vmid" "$@"

@@ -1,0 +1,34 @@
+# bash completion for ct (wrapper around pct)
+#
+# The second argument completes container names (by prefix, falling back to fragment).
+# Everything else is delegated to pct's own completion (`pct bashcomplete`),
+# with the container name in the command line replaced by its VMID.
+
+# Same as the pct completion: ':' must not split words (local:vztmpl/...).
+COMP_WORDBREAKS=${COMP_WORDBREAKS//:}
+
+_ct() {
+  local cur=${COMP_WORDS[COMP_CWORD]}
+
+  if ((COMP_CWORD == 2)) && [[ ! ${COMP_WORDS[1]} =~ ^(list|cpusets|help)$ && $cur != -* ]]; then
+    local names
+    names=$(pct list 2>/dev/null | awk 'NR > 1 { print $NF }')
+    mapfile -t COMPREPLY < <(compgen -W "$names" -- "$cur")
+    if ((${#COMPREPLY[@]} == 0)) && [[ -n $cur ]]; then
+      mapfile -t COMPREPLY < <(grep -iF -- "$cur" <<<"$names")
+    fi
+    return
+  fi
+
+  local words=(pct "${COMP_WORDS[@]:1:COMP_CWORD}")
+  if ((COMP_CWORD > 2)); then
+    words[2]=$(ct __resolve "${words[2]}" 2>/dev/null) || words[2]=${COMP_WORDS[2]}
+  fi
+  local line="${words[*]}"
+
+  mapfile -t COMPREPLY < <(
+    COMP_LINE=$line COMP_POINT=${#line} pct bashcomplete pct "$cur" "${words[COMP_CWORD - 1]}" 2>/dev/null
+  )
+}
+
+complete -o default -F _ct ct
