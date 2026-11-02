@@ -11,6 +11,7 @@ cat >"$tmp/pct" <<'EOF'
 #!/usr/bin/env bash
 case ${1-} in
   list)
+    [[ -z ${PCT_LIST_FAILS-} ]] || { echo "pct list failed" >&2; exit 2; }
     cat <<'LIST'
 VMID       Status     Lock         Name
 100        running                 web
@@ -76,6 +77,9 @@ check "help passes through"             "0: pct help enter"                    "
 check "option instead of VMID"          "0: pct enter --help"                  "$(ct_out enter --help)"
 check "__resolve prints the VMID"       "0: 101"                               "$(ct_out __resolve stag)"
 check "__resolve keeps a plain VMID"    "0: 555"                               "$(ct_out __resolve 555)"
+check "failing pct list runs nothing"   "1: "                                  "$(PCT_LIST_FAILS=1 ct_out enter web)"
+check "failing pct list message"        "ct: cannot list containers"           "$(PCT_LIST_FAILS=1 ct enter web 2>&1 >/dev/null | tail -n1)"
+check "failing pct list, VMID"          "1: "                                  "$(PCT_LIST_FAILS=1 ct_out enter 100)"
 check "destroy by exact name"           "0: pct destroy 100"                   "$(ct_out destroy web)"
 # Without a terminal the confirmation prompt cannot be answered, so nothing must run.
 # shellcheck disable=SC2016

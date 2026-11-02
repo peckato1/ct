@@ -53,6 +53,9 @@ shift 2
 numeric=false
 [[ $target =~ ^[0-9]+$ ]] && numeric=true
 
+# Read the list first: a failure inside the process substitution below would go unnoticed.
+containers=$(pct list) || die "cannot list containers"
+
 # "VMID Status Lock Name" — Lock is often empty, so take the first and last column.
 id_name="" exact=() fuzzy=()
 while read -r id name; do
@@ -60,7 +63,7 @@ while read -r id name; do
   if [[ $id == "$target" ]]; then id_name=$name; continue; fi
   if [[ $name == "$target" ]]; then exact+=("$id $name"); fi
   if ! $numeric && [[ ${name,,} == *"${target,,}"* ]]; then fuzzy+=("$id $name"); fi
-done < <(pct list | awk 'NR > 1 { print $1, $NF }')
+done < <(awk 'NR > 1 { print $1, $NF }' <<<"$containers")
 
 if [[ -n $id_name ]] && ((${#exact[@]})); then
   ambiguous "'$target' is the VMID of '$id_name' and also the name of another container, doing nothing:" "${exact[@]}"
