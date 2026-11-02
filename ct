@@ -19,7 +19,8 @@ ct lists them and runs nothing. Destroy by fragment asks for confirmation.
 
 A number is a VMID or an exact name, never a fragment. A number that matches
 neither is passed through unchanged (create, restore); one that is both
-a VMID and another container's name is refused.
+a VMID and another container's name is refused. Destroy by a number that is
+a name, not a VMID, asks for confirmation too.
 
 Anything else (no container argument, list, cpusets, help, options)
 is passed straight to pct; see `ct help` for pct's commands.
@@ -86,8 +87,8 @@ if [[ $cmd == __resolve ]]; then
 fi
 
 if [[ -n $name ]]; then
-  # Destroy by fragment requires confirmation.
-  if [[ $cmd == destroy ]] && ((${#exact[@]} == 0)); then
+  # Destroy by fragment requires confirmation, and so does a number that is a name: it looks like a VMID.
+  if [[ $cmd == destroy ]] && { ((${#exact[@]} == 0)) || $numeric; }; then
     read -rp "ct: really pct destroy $vmid ($name)? [y/N] " answer </dev/tty
     [[ $answer == [yY] ]] || die "aborted"
   fi
