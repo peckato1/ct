@@ -12,7 +12,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Shellcheck
         run: shellcheck -x -s bash ct ct.bash-completion test.sh build-deb.sh
@@ -27,6 +27,13 @@ jobs:
           else
             ./build-deb.sh "0~git${GITHUB_SHA::7}"
           fi
+
+      # Every run keeps its .deb as a downloadable artifact (zipped, kept for 90 days).
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ct-deb
+          path: dist/ct_*_all.deb
+          if-no-files-found: error
 
       # Also attached as ct_all.deb, so releases/latest/download/ct_all.deb always points to the newest one.
       - name: Release
