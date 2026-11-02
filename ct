@@ -96,7 +96,10 @@ if [[ -n $name ]]; then
   # Destroy by fragment or by the name in another case requires confirmation,
   # and so does a number that is a name: it looks like a VMID.
   if [[ $cmd == destroy ]] && { ((${#exact[@]} == 0)) || $numeric; }; then
-    read -rp "ct: really pct destroy $vmid ($name)? [y/N] " answer </dev/tty
+    # Ask on the terminal even when stdin is redirected; without one, bash's own error would be all that shows.
+    { exec 3</dev/tty; } 2>/dev/null || die "cannot ask for confirmation without a terminal, doing nothing"
+    read -rp "ct: really pct destroy $vmid ($name)? [y/N] " answer <&3 || { echo >&2; die "aborted"; }
+    exec 3<&-
     [[ $answer == [yY] ]] || die "aborted"
   fi
   echo "→ pct $cmd $vmid ($name)" >&2

@@ -85,6 +85,7 @@ check "destroy by exact name"           "0: pct destroy 100"                   "
 # Without a terminal the confirmation prompt cannot be answered, so nothing must run.
 # shellcheck disable=SC2016
 check "destroy by fragment needs a tty" "1: "                                  "$(setsid -w bash -c 'out=$(ct destroy stag 2>/dev/null); echo "$?: $out"')"
+check "no tty message"                  "ct: cannot ask for confirmation without a terminal, doing nothing" "$(setsid -w ct destroy stag 2>&1 >/dev/null)"
 # shellcheck disable=SC2016
 check "destroy by number-as-name needs a tty" "1: "                            "$(setsid -w bash -c 'out=$(ct destroy 42 2>/dev/null); echo "$?: $out"')"
 # shellcheck disable=SC2016
