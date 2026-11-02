@@ -35,8 +35,10 @@ See `ct --help` for the details.
 On the Proxmox host (the package depends on `pve-container`):
 
 ```sh
-wget https://github.com/peckato1/ct/releases/latest/download/ct_all.deb
-apt install ./ct_all.deb
+wget -O /usr/share/keyrings/ct.gpg https://peckato1.github.io/ct/ct.gpg
+wget -O /etc/apt/sources.list.d/ct.sources https://peckato1.github.io/ct/ct.sources
+apt update
+apt install ct
 ```
 
 Without the package (needs bash 4.4 or newer):
@@ -49,4 +51,4 @@ install -m 644 ct.bash-completion /usr/share/bash-completion/completions/ct
 ## Development
 
 Run `./test.sh` for the tests (against a fake `pct`) and `./build-deb.sh 1.0.0` to build the package into `dist/`.
-A pushed `v1.0.0` tag makes CI publish the release.
+A pushed `v1.0.0` tag makes CI publish the release and update the APT repository.

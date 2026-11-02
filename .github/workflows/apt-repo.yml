@@ -1,0 +1,70 @@
+name: APT repository
+
+# Rebuilds the APT repository on GitHub Pages from the .debs of all releases.
+# The CI release step starts it on main (the github-pages environment only deploys
+# from the default branch); it can also be run by hand.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download release packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir debs
+          for tag in $(gh release list --limit 1000 --json tagName --jq '.[].tagName'); do
+            gh release download "$tag" --pattern 'ct_*_all.deb' --dir debs
+          done
+          ls -l debs
+
+      - name: Import signing key
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+        run: gpg --batch --import <<<"$APT_SIGNING_KEY"
+
+      - name: Install apt-ftparchive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends apt-utils
+
+      - name: Build repository
+        run: ./build-apt-repo.sh debs site
+
+      # Check the repository the way apt sees it: signature, Release and Packages.
+      # apt's _apt user can't read anything under /home/runner, so test a copy in /srv.
+      - name: Verify with apt
+        run: |
+          gpg --show-keys site/ct.gpg
+          sudo cp -r site /srv/ct-apt
+          sudo chmod -R a+rX /srv/ct-apt
+          echo "deb [signed-by=/srv/ct-apt/ct.gpg] file:///srv/ct-apt stable main" >ct-test.list
+          # apt-cache needs the same sources, or it ignores the downloaded lists.
+          only_ct=(-o Dir::Etc::sourcelist="$PWD/ct-test.list" -o Dir::Etc::sourceparts=-)
+          sudo apt-get update --error-on=any "${only_ct[@]}" -o APT::Get::List-Cleanup=0
+          apt-cache "${only_ct[@]}" policy ct
+          apt-cache "${only_ct[@]}" show ct >/dev/null
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v5
