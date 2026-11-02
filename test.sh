@@ -110,6 +110,8 @@ check "all names"                       "web web-staging db Mail 42 111 102" "$(
 check "subcommand goes to pct"          "pct sta|sta|pct"                      "$(complete_ct sta)"
 check "help gets no names"              "pct help e|e|help"                    "$(complete_ct help e)"
 check "name is replaced by VMID"        "pct snapshot 101 ||101"               "$(complete_ct snapshot stag '')"
+check "help argument is not resolved"   "pct help db ||db"                     "$(complete_ct help db '')"
+check "option is not resolved"          "pct enter --help ||--help"            "$(complete_ct enter --help '')"
 
 echo
 if ((failures)); then

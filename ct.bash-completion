@@ -8,9 +8,14 @@
 COMP_WORDBREAKS=${COMP_WORDBREAKS//:}
 
 _ct() {
-  local cur=${COMP_WORDS[COMP_CWORD]}
+  local cur=${COMP_WORDS[COMP_CWORD]} container=false
 
-  if ((COMP_CWORD == 2)) && [[ ! ${COMP_WORDS[1]} =~ ^(list|cpusets|help)$ && $cur != -* ]]; then
+  # As in ct: the second word is a container, unless the command takes none or it is an option.
+  if ((COMP_CWORD >= 2)) && [[ ! ${COMP_WORDS[1]} =~ ^(list|cpusets|help)$ && ${COMP_WORDS[2]} != -* ]]; then
+    container=true
+  fi
+
+  if ((COMP_CWORD == 2)) && $container; then
     local names
     names=$(pct list 2>/dev/null | awk 'NR > 1 { print $NF }')
     mapfile -t COMPREPLY < <(compgen -W "$names" -- "$cur")
@@ -21,7 +26,7 @@ _ct() {
   fi
 
   local words=(pct "${COMP_WORDS[@]:1:COMP_CWORD}")
-  if ((COMP_CWORD > 2)); then
+  if ((COMP_CWORD > 2)) && $container; then
     words[2]=$(ct __resolve "${words[2]}" 2>/dev/null) || words[2]=${COMP_WORDS[2]}
   fi
   local line="${words[*]}"
