@@ -22,10 +22,10 @@ ct <command> <name|fragment|vmid> [args...]
 | `ct start 102`            | `pct start 102` — plain VMIDs still work          |
 | `ct list`, `ct help`      | passed to `pct` unchanged                         |
 
-- An exact name wins over a fragment; fragments are case-insensitive.
+- An exact name wins, then the name ignoring case, then a fragment (also case-insensitive).
 - When more containers match, ct lists them and runs nothing.
 - A number is a VMID or an exact name, never a fragment, so `ct restore 11 … --force` can't overwrite container 111.
-- `ct destroy` with a fragment asks for confirmation, and so does a number that is a name, not a VMID.
+- `ct destroy` with a fragment or the name in another case asks for confirmation, and so does a number that is a name, not a VMID.
 
 Bash completion completes container names and leaves the rest to `pct`'s own completion.
 See `ct --help` for the details.

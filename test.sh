@@ -55,6 +55,7 @@ ct_err() { ct "$@" 2>&1 >/dev/null | head -n1; }
 echo "# ct"
 check "exact name wins over fragment"   "0: pct enter 100"                     "$(ct_out enter web)"
 check "unique fragment"                 "0: pct stop 101"                      "$(ct_out stop stag)"
+check "exact name ignoring case wins"   "0: pct enter 100"                     "$(ct_out enter WEB)"
 check "fragment is case-insensitive"    "0: pct enter 103"                     "$(ct_out enter mail)"
 check "lock column is skipped"          "0: pct enter 102"                     "$(ct_out enter db)"
 check "extra arguments are kept"        "0: pct snapshot 101 pre-upg --vmstate" "$(ct_out snapshot stag pre-upg --vmstate)"
@@ -86,6 +87,8 @@ check "destroy by exact name"           "0: pct destroy 100"                   "
 check "destroy by fragment needs a tty" "1: "                                  "$(setsid -w bash -c 'out=$(ct destroy stag 2>/dev/null); echo "$?: $out"')"
 # shellcheck disable=SC2016
 check "destroy by number-as-name needs a tty" "1: "                            "$(setsid -w bash -c 'out=$(ct destroy 42 2>/dev/null); echo "$?: $out"')"
+# shellcheck disable=SC2016
+check "destroy ignoring case needs a tty" "1: "                                "$(setsid -w bash -c 'out=$(ct destroy WEB 2>/dev/null); echo "$?: $out"')"
 check "destroy by VMID"                 "0: pct destroy 100"                   "$(ct_out destroy 100)"
 
 echo "# completion"

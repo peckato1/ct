@@ -14,8 +14,9 @@ Wrapper around pct that takes a container name instead of a VMID.
   ct snapshot web pre-upg  remaining arguments go to pct unchanged
   ct start 105             numeric VMIDs still work
 
-Lookup order: exact name, then fragment. When more containers match,
-ct lists them and runs nothing. Destroy by fragment asks for confirmation.
+Lookup order: exact name, then the name ignoring case, then fragment.
+When more containers match, ct lists them and runs nothing. Destroy asks
+for confirmation unless the name matched exactly.
 
 A number is a VMID or an exact name, never a fragment. A number that matches
 neither is passed through unchanged (create, restore); one that is both
@@ -57,11 +58,12 @@ numeric=false
 containers=$(pct list) || die "cannot list containers"
 
 # "VMID Status Lock Name" — Lock is often empty, so take the first and last column.
-id_name="" exact=() fuzzy=()
+id_name="" exact=() exact_ci=() fuzzy=()
 while read -r id name; do
   # The container with this VMID only counts as an ID match, so a name equal to its own VMID is no clash.
   if [[ $id == "$target" ]]; then id_name=$name; continue; fi
   if [[ $name == "$target" ]]; then exact+=("$id $name"); fi
+  if [[ ${name,,} == "${target,,}" ]]; then exact_ci+=("$id $name"); fi
   if ! $numeric && [[ ${name,,} == *"${target,,}"* ]]; then fuzzy+=("$id $name"); fi
 done < <(awk 'NR > 1 { print $1, $NF }' <<<"$containers")
 
@@ -73,8 +75,9 @@ if $numeric && ((${#exact[@]} == 0)); then
   # Plain VMID, or a nonexistent one (create, restore…) — pass through unchanged.
   vmid=$target name=""
 else
-  # An exact name match wins over fragments.
+  # An exact name match wins over the name in another case, which wins over fragments.
   matches=("${exact[@]}")
+  ((${#matches[@]})) || matches=("${exact_ci[@]}")
   ((${#matches[@]})) || matches=("${fuzzy[@]}")
   case ${#matches[@]} in
     0) die "no container matches '$target'" ;;
@@ -90,7 +93,8 @@ if [[ $cmd == __resolve ]]; then
 fi
 
 if [[ -n $name ]]; then
-  # Destroy by fragment requires confirmation, and so does a number that is a name: it looks like a VMID.
+  # Destroy by fragment or by the name in another case requires confirmation,
+  # and so does a number that is a name: it looks like a VMID.
   if [[ $cmd == destroy ]] && { ((${#exact[@]} == 0)) || $numeric; }; then
     read -rp "ct: really pct destroy $vmid ($name)? [y/N] " answer </dev/tty
     [[ $answer == [yY] ]] || die "aborted"
